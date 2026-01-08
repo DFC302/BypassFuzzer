@@ -226,7 +226,7 @@ class BypassFuzzer:
 
         session = httpx.Client(
             http2=(http_vers == "HTTP/2"),
-            proxies=self.proxies,
+            proxy=self.proxies.get("http") or self.proxies.get("https") if self.proxies else None,
             verify=False
         )
 
@@ -264,7 +264,7 @@ class BypassFuzzer:
 
         session = httpx.Client(
             http2=(http_vers == "HTTP/2"),
-            proxies=self.proxies,
+            proxy=self.proxies.get("http") or self.proxies.get("https") if self.proxies else None,
             verify=False
         )
         parsed = urlsplit(self.url)
@@ -301,7 +301,7 @@ class BypassFuzzer:
 
         session = httpx.Client(
             http2=(http_vers == "HTTP/2"),
-            proxies=self.proxies,
+            proxy=self.proxies.get("http") or self.proxies.get("https") if self.proxies else None,
             verify=False
         )
 
@@ -342,7 +342,7 @@ class BypassFuzzer:
 
         session = httpx.Client(
             http2=(http_vers == "HTTP/2"),
-            proxies=self.proxies,
+            proxy=self.proxies.get("http") or self.proxies.get("https") if self.proxies else None,
             verify=False
         )
 
@@ -404,7 +404,7 @@ class BypassFuzzer:
 
         session = httpx.Client(
             http2=(http_vers == "HTTP/2"),
-            proxies=self.proxies,
+            proxy=self.proxies.get("http") or self.proxies.get("https") if self.proxies else None,
             verify=False
         )
 
@@ -501,7 +501,7 @@ class BypassFuzzer:
 
         session = httpx.Client(
             http2=False,
-            proxies=self.proxies,
+            proxy=self.proxies.get("http") or self.proxies.get("https") if self.proxies else None,
             verify=False
         )
 
