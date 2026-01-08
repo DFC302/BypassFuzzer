@@ -105,8 +105,19 @@ parser.add_argument(
     help="Skip testing verb attacks",
 )
 parser.add_argument(
-    "-sp", "--skip-protocol", action="store_true", default=False, dest="skip_protocol", 
+    "-sp", "--skip-protocol", action="store_true", default=False, dest="skip_protocol",
     help="Skip testing HTTP protocol attacks",
+)
+parser.add_argument(
+    "-spp", "--skip-pp", action="store_true", default=False, dest="skip_pp",
+    help="Skip testing HTTP Parameter Pollution attacks",
+)
+
+# Parameter pollution targeting
+parser.add_argument(
+    "--target-param", action="append", default=None, dest="target_params",
+    help='Target specific parameter(s) for pollution testing \
+         (e.g., --target-param id --target-param user). Default is all parameters.',
 )
 
 # interaction handling
@@ -263,6 +274,12 @@ if __name__ == "__main__":
 
     if not args.skip_method:
         Fuzzer.verb_attack(req_method, http_vers, headers, body_data, cookies)
+
+    if not args.skip_pp:
+        Fuzzer.param_pollution_attack(
+            req_method, http_vers, headers, body_data, cookies,
+            target_params=args.target_params
+        )
 
     if not args.skip_protocol:
         Fuzzer.http_proto_attack(req_method, headers, body_data, cookies)

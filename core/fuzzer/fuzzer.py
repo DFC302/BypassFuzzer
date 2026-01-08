@@ -497,6 +497,182 @@ class BypassFuzzer:
 
         session.close()
 
+    def _extract_params(self):
+        """Extract query parameters from URL"""
+        from urllib.parse import parse_qs
+
+        parsed = urlsplit(self.url)
+        params = parse_qs(parsed.query)
+
+        # parse_qs returns lists, get first value for each param
+        return {k: v[0] if v else '' for k, v in params.items()}
+
+    def _generate_pollution_payloads(self, params):
+        """Generate HTTP Parameter Pollution payloads"""
+        from urllib.parse import quote
+
+        parsed = urlsplit(self.url)
+        base_url = urlunsplit((parsed.scheme, parsed.netloc, parsed.path, '', ''))
+
+        payloads = []
+
+        # Common auth bypass values to test
+        pollution_values = [
+            '1',
+            '0',
+            'true',
+            'false',
+            'admin',
+            '999',
+            'null',
+            '',
+        ]
+
+        for param_name, original_value in params.items():
+            # Pattern 1: Parameter Duplication - test order matters
+            for bypass_value in pollution_values:
+                # Original first, bypass second (frameworks that use last value)
+                query_parts = []
+                for k, v in params.items():
+                    if k == param_name:
+                        query_parts.append(f"{k}={v}")
+                        query_parts.append(f"{k}={bypass_value}")
+                    else:
+                        query_parts.append(f"{k}={v}")
+                payloads.append((f"{base_url}?{'&'.join(query_parts)}", f"{param_name}={original_value}&{param_name}={bypass_value}"))
+
+                # Bypass first, original second (frameworks that use first value)
+                query_parts = []
+                for k, v in params.items():
+                    if k == param_name:
+                        query_parts.append(f"{k}={bypass_value}")
+                        query_parts.append(f"{k}={v}")
+                    else:
+                        query_parts.append(f"{k}={v}")
+                payloads.append((f"{base_url}?{'&'.join(query_parts)}", f"{param_name}={bypass_value}&{param_name}={original_value}"))
+
+            # Pattern 2: Array Notation Pollution
+            for bypass_value in pollution_values:
+                query_parts = []
+                for k, v in params.items():
+                    if k == param_name:
+                        query_parts.append(f"{k}[]={v}")
+                        query_parts.append(f"{k}[]={bypass_value}")
+                    else:
+                        query_parts.append(f"{k}={v}")
+                payloads.append((f"{base_url}?{'&'.join(query_parts)}", f"{param_name}[]={original_value}&{param_name}[]={bypass_value}"))
+
+                # Mixed scalar and array
+                query_parts = []
+                for k, v in params.items():
+                    if k == param_name:
+                        query_parts.append(f"{k}={v}")
+                        query_parts.append(f"{k}[]={bypass_value}")
+                    else:
+                        query_parts.append(f"{k}={v}")
+                payloads.append((f"{base_url}?{'&'.join(query_parts)}", f"{param_name}={original_value}&{param_name}[]={bypass_value}"))
+
+            # Pattern 3: Case Variation Pollution
+            for bypass_value in ['admin', 'true', '1']:
+                if param_name.lower() != param_name.upper():  # Only if case matters
+                    variations = [
+                        param_name.upper(),
+                        param_name.capitalize(),
+                        param_name.lower() if param_name != param_name.lower() else param_name.upper()
+                    ]
+                    for variant in variations:
+                        query_parts = []
+                        for k, v in params.items():
+                            if k == param_name:
+                                query_parts.append(f"{k}={v}")
+                                query_parts.append(f"{variant}={bypass_value}")
+                            else:
+                                query_parts.append(f"{k}={v}")
+                        payloads.append((f"{base_url}?{'&'.join(query_parts)}", f"{param_name}={original_value}&{variant}={bypass_value}"))
+
+            # Pattern 4: Encoded Delimiter Truncation
+            for bypass_value in pollution_values:
+                # URL-encoded # (hash/fragment) - can truncate query string parsing
+                query_parts = []
+                for k, v in params.items():
+                    if k == param_name:
+                        query_parts.append(f"{k}={v}%23")  # URL-encoded #
+                    else:
+                        query_parts.append(f"{k}={v}")
+                query_parts.append(f"{param_name}={bypass_value}")
+                payloads.append((f"{base_url}?{'&'.join(query_parts)}", f"{param_name}={original_value}%23&{param_name}={bypass_value}"))
+
+                # URL-encoded & (ampersand)
+                query_parts = []
+                for k, v in params.items():
+                    if k == param_name:
+                        query_parts.append(f"{k}={v}%26{param_name}={bypass_value}")
+                    else:
+                        query_parts.append(f"{k}={v}")
+                payloads.append((f"{base_url}?{'&'.join(query_parts)}", f"{param_name}={original_value}%26{param_name}={bypass_value}"))
+
+                # URL-encoded ; (semicolon)
+                query_parts = []
+                for k, v in params.items():
+                    if k == param_name:
+                        query_parts.append(f"{k}={v}%3B{param_name}={bypass_value}")
+                    else:
+                        query_parts.append(f"{k}={v}")
+                payloads.append((f"{base_url}?{'&'.join(query_parts)}", f"{param_name}={original_value}%3B{param_name}={bypass_value}"))
+
+        return payloads
+
+    def param_pollution_attack(self, method, http_vers, headers, body_data, cookies, target_params=None):
+        """Test for HTTP Parameter Pollution bypasses"""
+
+        print("\n\n⚡ Parameter Pollution Attack...")
+
+        if self.filter:
+            self.filter.db = {}
+
+        # Extract parameters from URL
+        params = self._extract_params()
+
+        if not params:
+            print("No parameters detected in URL. Skipping parameter pollution tests.")
+            return
+
+        # Filter to target specific parameters if specified
+        if target_params:
+            params = {k: v for k, v in params.items() if k in target_params}
+            if not params:
+                print(f"None of the specified target parameters found in URL: {target_params}")
+                return
+            print(f"Targeting parameters: {', '.join(params.keys())}")
+        else:
+            print(f"Testing all parameters: {', '.join(params.keys())}")
+
+        # Generate pollution payloads
+        payloads = self._generate_pollution_payloads(params)
+
+        print(f"Generated {len(payloads)} parameter pollution payloads\n")
+
+        session = httpx.Client(
+            http2=(http_vers == "HTTP/2"),
+            proxy=self.proxies.get("http") or self.proxies.get("https") if self.proxies else None,
+            verify=False
+        )
+
+        for payload_url, payload_display in payloads:
+            self.pause_if_needed()
+
+            response = funcs.send_url_attack(
+                session, payload_url, method, headers, body_data, cookies
+            )
+
+            if response is not None:
+                self.show_results(response, payload_display, self.hide, show_resp_headers=False)
+                if response.status_code in self.save_interactions:
+                    self.db_handler.save_interaction(self.payload_index, response.request, response, payload_display)
+
+            self.payload_index += 1
+
+        session.close()
 
     def http_proto_attack(self, method, headers, body_data, cookies):
         """
