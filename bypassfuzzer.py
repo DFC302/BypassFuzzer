@@ -86,10 +86,6 @@ parser.add_argument(
     "-sf", "--smart", action="store_true", default=False, dest="smart_filter",
     help="Enable the smart filter",
 )
-parser.add_argument(
-    "-so", "--success-only", action="store_true", default=False, dest="success_only",
-    help="Hide error responses (4xx, 5xx) and only show successful responses (2xx, 3xx)",
-)
 
 # Skip attacks
 parser.add_argument(
@@ -154,7 +150,7 @@ if args.proxy:
         exit(1)
 
 # get response codes and lengths to hide from result
-hide = {"codes": [], "lengths": [], "success_only": args.success_only}
+hide = {"codes": [], "lengths": []}
 if args.hc:
     for i in args.hc.split(","):
         hide["codes"].append(i)
@@ -164,10 +160,6 @@ if args.hl:
 
 if args.smart_filter and (args.hc or args.hl):
     print("Can't do smart filter together with hide code or hide length yet")
-    sys.exit(1)
-
-if args.success_only and (args.hc or args.hl):
-    print("Can't use --success-only together with -hc or -hl")
     sys.exit(1)
 
 # read a text file with a request in it
